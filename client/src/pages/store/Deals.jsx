@@ -1,7 +1,10 @@
 import CatalogBrowser from '../../components/store/CatalogBrowser';
 import StorePageShell from '../../components/store/StorePageShell';
+import usePageMeta from '../../hooks/usePageMeta';
 
-const Deals = () => (
+const Deals = () => {
+  usePageMeta({ title: 'Deals', description: 'Current offers configured in the XSHOP catalog, with pricing and timing resolved by the database.', canonicalPath: '/deals' });
+  return (
   <StorePageShell
     eyebrow="XSHOP / OFFERS"
     title="Deals"
@@ -13,6 +16,7 @@ const Deals = () => (
       emptyDescription="There are no live deal records matching these filters. No sale price or promotion is invented for the storefront."
     />
   </StorePageShell>
-);
+  );
+};
 
 export default Deals;

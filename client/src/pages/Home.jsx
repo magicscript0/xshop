@@ -4,8 +4,10 @@ import { Link } from 'react-router-dom';
 import ProductGrid from '../components/store/ProductGrid';
 import StoreHero from '../components/store/StoreHero';
 import { catalogService } from '../services/catalogService';
+import usePageMeta from '../hooks/usePageMeta';
 
 const Home = () => {
+  usePageMeta({ description: 'XSHOP is a premium digital storefront for game credits, gift cards, vouchers, and software licenses with secure crypto checkout.', canonicalPath: '/' });
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

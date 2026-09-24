@@ -1,7 +1,7 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase/client';
 import { catalogService } from './catalogService';
 
-const ORDER_FIELDS = 'id,created_at,updated_at,contact_email,currency_code,subtotal_amount,discount_amount,total_amount,payment_status,fulfillment_status';
+const ORDER_FIELDS = 'id,created_at,updated_at,contact_email,currency_code,subtotal_amount,discount_amount,coupon_code_snapshot,coupon_discount_amount,reward_points_redeemed,reward_discount_amount,total_amount,payment_status,fulfillment_status';
 
 const requireStore = () => {
   if (!isSupabaseConfigured || !supabase) {
@@ -15,6 +15,9 @@ const throwServiceError = (error, fallback) => {
   const message = typeof error.message === 'string' ? error.message.toLowerCase() : '';
   if (message.includes('not found')) throw new Error('This record is unavailable or does not belong to your account.');
   if (message.includes('authentication')) throw new Error('Sign in to continue.');
+  if (message.includes('too many requests')) throw new Error('Too many requests. Please wait a moment and try again.');
+  // Business-rule errors raised by database functions are safe, human-readable messages.
+  if (error.code && ['P0001', '22023'].includes(error.code)) throw new Error(error.message || fallback);
   throw new Error(fallback);
 };
 
@@ -26,10 +29,12 @@ const callRpc = async (name, args, fallback) => {
 };
 
 export const customerService = {
-  async createOrderFromCart(contactEmail, idempotencyKey) {
+  async createOrderFromCart(contactEmail, idempotencyKey, { couponCode = null, redeemPoints = 0 } = {}) {
     return callRpc('create_order_from_cart', {
       _contact_email: contactEmail,
       _idempotency_key: idempotencyKey,
+      _coupon_code: couponCode || null,
+      _redeem_points: redeemPoints > 0 ? Math.trunc(redeemPoints) : 0,
     }, 'Your order could not be created. Review your cart and try again.');
   },
 

@@ -1,6 +1,6 @@
 import { createElement, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Heart, LogOut, Menu, Search, ShoppingBag, UserRound, X } from 'lucide-react';
+import { Heart, LogOut, Menu, Search, ShieldCheck, ShoppingBag, UserRound, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import useAuth from '../hooks/useAuth';
@@ -54,10 +54,15 @@ const Navbar = () => {
     setShowNavbar(true);
   }, [location.pathname]);
 
+  // The link only affects navigation; admin pages are still role-gated in
+  // routing and every operation is enforced by Supabase RLS.
+  const isStaff = ['support', 'admin', 'super_admin'].includes(profile?.role);
+
   const utilityLinks = [
     { label: 'Search', to: '/search', icon: Search },
     { label: 'Wishlist', to: '/account/wishlist', icon: Heart },
     { label: 'Cart', to: '/cart', icon: ShoppingBag },
+    ...(isStaff ? [{ label: 'Admin', to: '/admin', icon: ShieldCheck }] : []),
   ];
 
   const handleSignOut = async () => {

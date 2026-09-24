@@ -1,8 +1,11 @@
 import { HelpCircle, MessageSquare, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import StorePageShell from '../../components/store/StorePageShell';
+import usePageMeta from '../../hooks/usePageMeta';
 
-const Support = () => (
+const Support = () => {
+  usePageMeta({ title: 'Support', description: 'Product questions, order support, and account security for XSHOP customers.', canonicalPath: '/support' });
+  return (
   <StorePageShell
     eyebrow="XSHOP / SUPPORT"
     title="Support"
@@ -28,6 +31,7 @@ const Support = () => (
       </div>
     </div>
   </StorePageShell>
-);
+  );
+};
 
 export default Support;
