@@ -8,6 +8,7 @@ import useAuth from '../../hooks/useAuth';
 import { catalogService } from '../../services/catalogService';
 import { cartService } from '../../services/cartService';
 import { customerService } from '../../services/customerService';
+import usePageMeta from '../../hooks/usePageMeta';
 
 const formatMoney = (amount, currency) => {
   if (amount == null || !currency || !Number.isFinite(Number(amount))) return 'Price unavailable';
@@ -33,6 +34,7 @@ const ProductDetails = () => {
   const navigate = useNavigate();
   const { status } = useAuth();
   const [product, setProduct] = useState(null);
+  usePageMeta(product ? { title: product.name, description: product.short_description || product.description || `Buy ${product.name} on XSHOP.`, canonicalPath: `/products/${product.slug}` } : { title: 'Product' });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedPriceId, setSelectedPriceId] = useState('');

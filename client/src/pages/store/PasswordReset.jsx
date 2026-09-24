@@ -4,8 +4,10 @@ import { Link, useSearchParams } from 'react-router-dom';
 import StorePageShell from '../../components/store/StorePageShell';
 import useAuth from '../../hooks/useAuth';
 import { authService } from '../../services/authService';
+import usePageMeta from '../../hooks/usePageMeta';
 
 const PasswordReset = () => {
+  usePageMeta({ title: 'Reset password', noindex: true });
   const { status, isConfigured, updatePassword } = useAuth();
   const [searchParams] = useSearchParams();
   const tokenHash = searchParams.get('token_hash');

@@ -4,8 +4,10 @@ import { Link } from 'react-router-dom';
 import StoreEmptyState from '../../components/store/StoreEmptyState';
 import StorePageShell from '../../components/store/StorePageShell';
 import { catalogService } from '../../services/catalogService';
+import usePageMeta from '../../hooks/usePageMeta';
 
 const Categories = () => {
+  usePageMeta({ title: 'Categories', description: 'Browse active XSHOP product categories.', canonicalPath: '/categories' });
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

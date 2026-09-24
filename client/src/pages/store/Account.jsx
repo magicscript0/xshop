@@ -1,16 +1,19 @@
 import { createElement, useEffect, useState } from 'react';
-import { ArrowRight, Bell, Heart, PackageCheck, Save, Settings2, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Bell, Gift, Heart, PackageCheck, Save, Settings2, ShieldCheck } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
+import usePageMeta from '../../hooks/usePageMeta';
 import StorePageShell from '../../components/store/StorePageShell';
 import AccountOrders from './AccountOrders';
 import AccountWishlist from './AccountWishlist';
 import AccountNotifications from './AccountNotifications';
+import AccountRewards from './AccountRewards';
 import OrderDetails from './OrderDetails';
 
 const accountLinks = [
   { label: 'Orders', to: '/account/orders', icon: PackageCheck, description: 'Account-owned order history and status' },
   { label: 'Wishlist', to: '/account/wishlist', icon: Heart, description: 'Products saved for later' },
+  { label: 'Rewards & referrals', to: '/account/rewards', icon: Gift, description: 'Points ledger and your referral code' },
   { label: 'Notifications', to: '/account/notifications', icon: Bell, description: 'Private order and account updates' },
   { label: 'Settings', to: '/account/settings', icon: Settings2, description: 'Profile and security settings' },
 ];
@@ -19,6 +22,7 @@ const getSectionTitle = (pathname) => {
   if (pathname.startsWith('/account/orders/')) return 'Order details';
   if (pathname === '/account/orders') return 'My orders';
   if (pathname === '/account/wishlist') return 'My wishlist';
+  if (pathname === '/account/rewards') return 'Rewards & referrals';
   if (pathname === '/account/settings') return 'Account settings';
   if (pathname === '/account/notifications') return 'Notifications';
   return 'Your account';
@@ -84,6 +88,7 @@ const AccountSettings = () => {
 const Account = () => {
   const { user, profile } = useAuth();
   const { pathname } = useLocation();
+  usePageMeta({ title: 'Your account', noindex: true });
   const displayName = profile?.display_name || user?.user_metadata?.display_name || user?.user_metadata?.full_name || 'Signed-in customer';
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
   const title = getSectionTitle(pathname);
@@ -123,8 +128,9 @@ const Account = () => {
             ) : pathname === '/account/settings' ? <AccountSettings />
               : pathname === '/account/orders' ? <AccountOrders />
                 : pathname === '/account/wishlist' ? <AccountWishlist />
-                  : pathname === '/account/notifications' ? <AccountNotifications />
-                    : <p className="text-sm text-gray-400">Choose an account section.</p>}
+                  : pathname === '/account/rewards' ? <AccountRewards />
+                    : pathname === '/account/notifications' ? <AccountNotifications />
+                      : <p className="text-sm text-gray-400">Choose an account section.</p>}
           </section>
         </div>
       )}

@@ -7,6 +7,7 @@ import StorePageShell from '../../components/store/StorePageShell';
 import useAuth from '../../hooks/useAuth';
 import { cartService } from '../../services/cartService';
 import { isSupabaseConfigured } from '../../lib/supabase/client';
+import usePageMeta from '../../hooks/usePageMeta';
 
 const formatMoney = (amount, currency) => {
   if (amount == null || !currency || !Number.isFinite(Number(amount))) return 'Unavailable';
@@ -18,6 +19,7 @@ const formatMoney = (amount, currency) => {
 };
 
 const Cart = () => {
+  usePageMeta({ title: 'Your cart', noindex: true });
   const { status } = useAuth();
   const [cart, setCart] = useState(null);
   const [loading, setLoading] = useState(true);

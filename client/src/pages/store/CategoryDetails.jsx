@@ -5,10 +5,12 @@ import CatalogBrowser from '../../components/store/CatalogBrowser';
 import StoreEmptyState from '../../components/store/StoreEmptyState';
 import StorePageShell from '../../components/store/StorePageShell';
 import { catalogService } from '../../services/catalogService';
+import usePageMeta from '../../hooks/usePageMeta';
 
 const CategoryDetails = () => {
   const { slug } = useParams();
   const [category, setCategory] = useState(null);
+  usePageMeta(category ? { title: category.name, description: category.description || `Browse ${category.name} products on XSHOP.`, canonicalPath: `/categories/${category.slug}` } : { title: 'Category' });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 

@@ -3,6 +3,7 @@ import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, UserRound } from 'lucide-re
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import StorePageShell from '../../components/store/StorePageShell';
 import useAuth from '../../hooks/useAuth';
+import usePageMeta from '../../hooks/usePageMeta';
 
 const getSafeDestination = (value) => (
   typeof value === 'string' && value.startsWith('/') && !value.startsWith('//')
@@ -32,6 +33,7 @@ const AuthPage = ({ mode = 'sign-in' }) => {
   const [notice, setNotice] = useState(null);
   const [canResendVerification, setCanResendVerification] = useState(false);
   const destination = getSafeDestination(location.state?.from);
+  usePageMeta({ title: mode === 'sign-up' ? 'Create account' : mode === 'forgot-password' ? 'Forgot password' : 'Sign in', noindex: true });
   const isSignUp = mode === 'sign-up';
   const isForgotPassword = mode === 'forgot-password';
   const heading = isSignUp ? 'Create your account' : isForgotPassword ? 'Reset your password' : 'Welcome back';

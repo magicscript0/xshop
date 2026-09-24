@@ -197,6 +197,12 @@ const OrderDetails = () => {
             <div className="mt-4 space-y-2 border-t border-white/10 pt-4 text-sm">
               <div className="flex justify-between text-gray-400"><span>Subtotal</span><span>{formatMoney(order.subtotal_amount, order.currency_code)}</span></div>
               <div className="flex justify-between text-gray-400"><span>Discount</span><span>−{formatMoney(order.discount_amount, order.currency_code)}</span></div>
+              {Number(order.coupon_discount_amount) > 0 && (
+                <div className="flex justify-between text-emerald-200"><span>Coupon{order.coupon_code_snapshot ? ` (${order.coupon_code_snapshot})` : ''}</span><span>−{formatMoney(order.coupon_discount_amount, order.currency_code)}</span></div>
+              )}
+              {Number(order.reward_discount_amount) > 0 && (
+                <div className="flex justify-between text-emerald-200"><span>Reward points ({order.reward_points_redeemed})</span><span>−{formatMoney(order.reward_discount_amount, order.currency_code)}</span></div>
+              )}
               <div className="flex justify-between pt-2 text-base font-semibold text-white"><span>Order total</span><span>{formatMoney(order.total_amount, order.currency_code)}</span></div>
             </div>
           </section>

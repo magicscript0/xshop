@@ -1,7 +1,10 @@
 import CatalogBrowser from '../../components/store/CatalogBrowser';
 import StorePageShell from '../../components/store/StorePageShell';
+import usePageMeta from '../../hooks/usePageMeta';
 
-const SearchPage = () => (
+const SearchPage = () => {
+  usePageMeta({ title: 'Search', description: 'Search published XSHOP products, identifiers, and active categories.', canonicalPath: '/search' });
+  return (
   <StorePageShell
     eyebrow="XSHOP / SEARCH"
     title="Find a product"
@@ -13,6 +16,7 @@ const SearchPage = () => (
       emptyDescription="Try another search term or clear one of the catalog filters."
     />
   </StorePageShell>
-);
+  );
+};
 
 export default SearchPage;
