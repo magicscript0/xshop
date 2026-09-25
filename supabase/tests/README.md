@@ -20,7 +20,8 @@ business logic end to end:
 ```bash
 cd supabase/tests
 npm install
-npm test
+npm test              # migration + business-logic suite (run.mjs)
+npm run verify:catalog  # starter-catalog storefront verification (verify-catalog.mjs)
 ```
 
 A green run prints `ALL TESTS PASSED`. Any failure prints the failed
@@ -31,6 +32,12 @@ database is in-memory and discarded after the run.
 > PostgreSQL 18.3 (`npm test` → `ALL TESTS PASSED`, exit 0). The suite
 > caught and drove the fixes for five never-executable statements in the
 > Phase 4/6 migrations — see `docs/SUPABASE_PHASE9.md` §2.
+>
+> Catalog status (2026-09-25): `npm run verify:catalog` applies
+> `supabase/seed.sql` and passes **74/74 assertions** (`CATALOG VERIFIED`):
+> 30 products / 102 variants / 8 deals across 6 categories, deal math,
+> filters, sorts, availability honesty (0 inventory rows), and RLS
+> intactness — see `docs/SUPABASE_SEED_CATALOG.md`.
 
 > These tests validate migration SQL and database behavior only. They do
 > not apply anything to Supabase — see `docs/SUPABASE_PHASE9.md` for the

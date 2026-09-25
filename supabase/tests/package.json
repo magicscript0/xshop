@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Local XSHOP migration + business-logic verification using embedded Postgres (PGlite). No credentials, no network database.",
   "scripts": {
-    "test": "node run.mjs"
+    "test": "node run.mjs",
+    "verify:catalog": "node verify-catalog.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8"
