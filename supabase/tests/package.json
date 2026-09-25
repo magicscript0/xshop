@@ -1,0 +1,13 @@
+{
+  "name": "xshop-db-tests",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Local XSHOP migration + business-logic verification using embedded Postgres (PGlite). No credentials, no network database.",
+  "scripts": {
+    "test": "node run.mjs"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8"
+  }
+}

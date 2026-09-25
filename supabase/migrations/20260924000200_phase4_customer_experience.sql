@@ -1,6 +1,10 @@
 -- XSHOP Phase 4: customer-owned cart, immutable order snapshots, wishlist, and notifications.
 -- All order pricing is derived from the current database catalog, never from browser totals.
 
+-- CORRECTION (2026-09-25): cart_add_item used a bare ON CONFLICT DO UPDATE, which
+-- PostgreSQL rejects at execution (a conflict target is required). The arbiter now
+-- matches the cart_items_one_option_per_cart unique index exactly. The broken
+-- statement could never execute, so no working behavior depended on it.
 begin;
 
 create table public.carts (
@@ -193,7 +197,8 @@ begin
 
   insert into public.cart_items as existing_item (cart_id, product_id, variant_id, quantity)
   values (cart_key, _product_id, _variant_id, _quantity)
-  on conflict do update set quantity = existing_item.quantity + excluded.quantity, updated_at = now()
+  on conflict (cart_id, product_id, (coalesce(variant_id, '00000000-0000-0000-0000-000000000000'::uuid)))
+  do update set quantity = existing_item.quantity + excluded.quantity, updated_at = now()
   returning quantity into updated_quantity;
 
   if updated_quantity > 20 then raise exception 'Cart quantity limit exceeded.' using errcode = '22023'; end if;

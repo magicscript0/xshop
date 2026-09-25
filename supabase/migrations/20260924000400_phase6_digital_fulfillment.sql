@@ -1,5 +1,16 @@
 -- XSHOP Phase 6: private digital inventory, reservations, idempotent fulfillment, and delivery outbox.
 -- Inventory is never seeded here and is never included by public catalog queries.
+-- CORRECTION (2026-09-25): the original draft called jsonb_object_length(), which does not
+-- exist in PostgreSQL, so this file could never execute. The four call sites now use the
+-- equivalent '{}'::jsonb comparison. Because this file runs in one transaction, no database
+-- can contain objects from the broken revision, so editing it in place is safe.
+-- PG18 NOTE: the bare CASE inside the fulfillment_manual_complete IF condition is wrapped
+-- in parentheses because PostgreSQL 18's plpgsql rejects a bare CASE in IF/ELSIF
+-- conditions (verified on PG 18.3; parenthesized form works on all versions).
+-- RUNTIME FIX: fulfill_verified_order/manual_complete declared fulfillment_id and
+-- delivery_index variables that collide with fulfillment_items columns, making every
+-- delivery insert fail with 'ambiguous column reference'. They are renamed to
+-- fulfillment_key/delivery_position (column lists untouched).
 
 begin;
 
@@ -29,7 +40,7 @@ create table public.digital_inventory (
     jsonb_typeof(delivery_payload) in ('string', 'object', 'array')
     and pg_column_size(delivery_payload) <= 16384
     and (jsonb_typeof(delivery_payload) <> 'string' or char_length(btrim(delivery_payload #>> '{}')) > 0)
-    and (jsonb_typeof(delivery_payload) <> 'object' or jsonb_object_length(delivery_payload) > 0)
+    and (jsonb_typeof(delivery_payload) <> 'object' or delivery_payload <> '{}'::jsonb)
     and (jsonb_typeof(delivery_payload) <> 'array' or jsonb_array_length(delivery_payload) > 0)
   ),
   import_batch_id uuid not null references public.digital_inventory_batches(batch_id) on delete restrict,
@@ -102,7 +113,7 @@ create table public.fulfillment_items (
       jsonb_typeof(manual_delivery_content) in ('string', 'object', 'array')
       and pg_column_size(manual_delivery_content) <= 16384
       and (jsonb_typeof(manual_delivery_content) <> 'string' or char_length(btrim(manual_delivery_content #>> '{}')) > 0)
-      and (jsonb_typeof(manual_delivery_content) <> 'object' or jsonb_object_length(manual_delivery_content) > 0)
+      and (jsonb_typeof(manual_delivery_content) <> 'object' or manual_delivery_content <> '{}'::jsonb)
       and (jsonb_typeof(manual_delivery_content) <> 'array' or jsonb_array_length(manual_delivery_content) > 0)
     )
   ),
@@ -255,7 +266,7 @@ begin
     where jsonb_typeof(item.value) not in ('string', 'object', 'array')
       or case jsonb_typeof(item.value)
         when 'string' then char_length(btrim(item.value #>> '{}')) = 0
-        when 'object' then jsonb_object_length(item.value) = 0
+        when 'object' then item.value = '{}'::jsonb
         when 'array' then jsonb_array_length(item.value) = 0
         else false
       end
@@ -443,11 +454,11 @@ set search_path = ''
 as $$
 declare
   order_record public.orders%rowtype;
-  fulfillment_id uuid;
+  fulfillment_key uuid;
   session_id uuid;
   item record;
   reserved record;
-  delivery_index integer;
+  delivery_position integer;
   reserved_count integer;
   needs_manual boolean := false;
   previous_status text;
@@ -458,7 +469,7 @@ begin
   insert into public.fulfillments (order_id, customer_id, status)
   values (_order_id, order_record.customer_id, 'processing')
   on conflict (order_id) do nothing;
-  select fulfillment.id, fulfillment.status into fulfillment_id, previous_status
+  select fulfillment.id, fulfillment.status into fulfillment_key, previous_status
   from public.fulfillments as fulfillment where fulfillment.order_id = _order_id for update;
   if previous_status in ('fulfilled', 'manual_required') then return; end if;
 
@@ -489,7 +500,7 @@ begin
         and reservation.status = 'reserved' and reservation.digital_inventory_id is not null;
       if reserved_count <> item.quantity then raise exception 'reserved_inventory_missing'; end if;
 
-      delivery_index := 0;
+      delivery_position := 0;
       for reserved in
         select reservation.id as reservation_id, reservation.digital_inventory_id
         from public.inventory_reservations as reservation
@@ -498,7 +509,7 @@ begin
         order by reservation.created_at, reservation.id
         for update
       loop
-        delivery_index := delivery_index + 1;
+        delivery_position := delivery_position + 1;
         update public.digital_inventory
         set status = 'assigned', reserved_order_id = null, reserved_order_item_id = null,
           reserved_payment_session_id = null, reservation_expires_at = null,
@@ -506,22 +517,22 @@ begin
         where id = reserved.digital_inventory_id and status = 'reserved' and reserved_payment_session_id = session_id;
         if not found then raise exception 'reserved_inventory_changed'; end if;
         insert into public.fulfillment_items (fulfillment_id, order_item_id, delivery_index, digital_inventory_id)
-        values (fulfillment_id, item.order_item_id, delivery_index, reserved.digital_inventory_id)
+        values (fulfillment_key, item.order_item_id, delivery_position, reserved.digital_inventory_id)
         on conflict (order_item_id, delivery_index) do nothing;
         update public.inventory_reservations set status = 'assigned', updated_at = now() where id = reserved.reservation_id;
       end loop;
     end loop;
 
     if needs_manual then
-      update public.fulfillments set status = 'manual_required', updated_at = now() where id = fulfillment_id;
+      update public.fulfillments set status = 'manual_required', updated_at = now() where id = fulfillment_key;
       update public.orders set fulfillment_status = 'manual_required' where id = _order_id;
       insert into public.fulfillment_events (fulfillment_id, event_type, from_status, to_status, details)
-      values (fulfillment_id, 'manual_required', coalesce(previous_status, 'processing'), 'manual_required', '{}'::jsonb);
+      values (fulfillment_key, 'manual_required', coalesce(previous_status, 'processing'), 'manual_required', '{}'::jsonb);
     else
-      update public.fulfillments set status = 'fulfilled', fulfilled_at = now(), updated_at = now() where id = fulfillment_id;
+      update public.fulfillments set status = 'fulfilled', fulfilled_at = now(), updated_at = now() where id = fulfillment_key;
       update public.orders set fulfillment_status = 'fulfilled' where id = _order_id;
       insert into public.fulfillment_events (fulfillment_id, event_type, from_status, to_status, details)
-      values (fulfillment_id, 'fulfilled', coalesce(previous_status, 'processing'), 'fulfilled', '{}'::jsonb);
+      values (fulfillment_key, 'fulfilled', coalesce(previous_status, 'processing'), 'fulfilled', '{}'::jsonb);
       insert into public.customer_notifications (customer_id, notification_type, title, message, related_order_id)
       values (order_record.customer_id, 'fulfillment', 'Digital order fulfilled', 'Your verified order is ready in your account.', _order_id);
       insert into public.fulfillment_email_outbox (order_id, event_type, recipient_email, payload)
@@ -529,10 +540,10 @@ begin
       on conflict (order_id, event_type) do nothing;
     end if;
   exception when others then
-    update public.fulfillments set status = 'failed', failure_code = 'assignment_failed', updated_at = now() where id = fulfillment_id;
+    update public.fulfillments set status = 'failed', failure_code = 'assignment_failed', updated_at = now() where id = fulfillment_key;
     update public.orders set fulfillment_status = 'failed' where id = _order_id;
     insert into public.fulfillment_events (fulfillment_id, event_type, from_status, to_status, details)
-    values (fulfillment_id, 'failed', coalesce(previous_status, 'processing'), 'failed', jsonb_build_object('code', 'assignment_failed'));
+    values (fulfillment_key, 'failed', coalesce(previous_status, 'processing'), 'failed', jsonb_build_object('code', 'assignment_failed'));
   end;
 end;
 $$;
@@ -662,7 +673,7 @@ as $$
 declare
   actor uuid := (select auth.uid());
   order_record public.orders%rowtype;
-  fulfillment_id uuid;
+  fulfillment_key uuid;
   row_record record;
   payload_item jsonb;
   item_id uuid;
@@ -681,9 +692,9 @@ begin
   end if;
   select * into order_record from public.orders as order_row where order_row.id = _order_id for update;
   if not found or order_record.payment_status <> 'verified' then raise exception 'Only a paid order is eligible for fulfillment.' using errcode = 'P0001'; end if;
-  select id into fulfillment_id from public.fulfillments where order_id = _order_id and status = 'fulfilled' for update;
-  if found then return fulfillment_id; end if;
-  select id into fulfillment_id from public.fulfillments where order_id = _order_id and status = 'manual_required' for update;
+  select id into fulfillment_key from public.fulfillments where order_id = _order_id and status = 'fulfilled' for update;
+  if found then return fulfillment_key; end if;
+  select id into fulfillment_key from public.fulfillments where order_id = _order_id and status = 'manual_required' for update;
   if not found then raise exception 'Order is not waiting for manual fulfillment.' using errcode = 'P0001'; end if;
 
   for row_record in select value from jsonb_array_elements(_deliveries)
@@ -707,17 +718,17 @@ begin
     loop
       expected_delivery_index := expected_delivery_index + 1;
       if jsonb_typeof(payload_item) not in ('string', 'object', 'array')
-        or case jsonb_typeof(payload_item)
+        or (case jsonb_typeof(payload_item)
           when 'string' then char_length(btrim(payload_item #>> '{}')) = 0
-          when 'object' then jsonb_object_length(payload_item) = 0
+          when 'object' then payload_item = '{}'::jsonb
           when 'array' then jsonb_array_length(payload_item) = 0
           else false
-        end
+        end)
         or pg_column_size(payload_item) > 16384 then
         raise exception 'Delivery payloads must be non-empty strings, objects, or arrays no larger than 16 KB.' using errcode = '22023';
       end if;
       insert into public.fulfillment_items (fulfillment_id, order_item_id, delivery_index, manual_delivery_content)
-      values (fulfillment_id, item_id, expected_delivery_index, payload_item);
+      values (fulfillment_key, item_id, expected_delivery_index, payload_item);
     end loop;
   end loop;
 
@@ -725,7 +736,7 @@ begin
   from public.fulfillment_items as delivery
   join public.order_items as item on item.id = delivery.order_item_id
   join public.product_prices as price on price.id = item.product_price_id
-  where delivery.fulfillment_id = fulfillment_id and price.fulfillment_mode = 'manual';
+  where delivery.fulfillment_id = fulfillment_key and price.fulfillment_mode = 'manual';
   if delivered_count <> (
     select coalesce(sum(item.quantity), 0)
     from public.order_items as item join public.product_prices as price on price.id = item.product_price_id
@@ -736,16 +747,16 @@ begin
   from public.order_items as item
   where reservation.order_item_id = item.id and item.order_id = _order_id
     and reservation.status = 'reserved' and reservation.digital_inventory_id is null;
-  update public.fulfillments set status = 'fulfilled', fulfilled_at = now(), updated_at = now() where id = fulfillment_id;
+  update public.fulfillments set status = 'fulfilled', fulfilled_at = now(), updated_at = now() where id = fulfillment_key;
   update public.orders set fulfillment_status = 'fulfilled' where id = _order_id;
   insert into public.fulfillment_events (fulfillment_id, actor_id, event_type, from_status, to_status, details)
-  values (fulfillment_id, actor, 'fulfilled', 'manual_required', 'fulfilled', jsonb_build_object('manual', true));
+  values (fulfillment_key, actor, 'fulfilled', 'manual_required', 'fulfilled', jsonb_build_object('manual', true));
   insert into public.customer_notifications (customer_id, notification_type, title, message, related_order_id)
   values (order_record.customer_id, 'fulfillment', 'Digital order fulfilled', 'Your verified order is ready in your account.', _order_id);
   insert into public.fulfillment_email_outbox (order_id, event_type, recipient_email, payload)
   values (_order_id, 'fulfilled', order_record.contact_email, jsonb_build_object('order_id', _order_id, 'template', 'order_fulfilled'))
   on conflict (order_id, event_type) do nothing;
-  return fulfillment_id;
+  return fulfillment_key;
 end;
 $$;
 
