@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase/client';
+import { logSupabaseError } from '../lib/supabase/errors';
 
 const CATALOG_PAGE_SIZE = 24;
 
@@ -50,10 +51,12 @@ const normalizeProduct = (row) => {
 };
 
 const normalizeRpcError = (error) => {
+  logSupabaseError('search_catalog failed', error);
   const message = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
   if (message.includes('choose a currency')) return 'Choose a currency before filtering by price.';
   if (message.includes('price page size') || message.includes('catalog page size')) return 'The catalog page request is invalid.';
-  return 'The catalog could not be loaded. Check the Supabase connection and confirm the catalog migrations are applied.';
+  const code = error?.code ? ` (${error.code})` : '';
+  return `Unable to load products. Please try again.${code}`;
 };
 
 export const catalogService = {
@@ -110,7 +113,10 @@ export const catalogService = {
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true });
 
-    if (error) throw new Error('Categories could not be loaded. Check the Supabase connection and catalog migration.');
+    if (error) {
+      logSupabaseError('listCategories failed', error);
+      throw new Error('Categories could not be loaded. Check the Supabase connection and catalog migration.');
+    }
     return data ?? [];
   },
 
@@ -124,7 +130,10 @@ export const catalogService = {
       .eq('visibility', 'public')
       .maybeSingle();
 
-    if (error) throw new Error('Category information could not be loaded.');
+    if (error) {
+      logSupabaseError('getCategoryBySlug failed', error);
+      throw new Error('Category information could not be loaded.');
+    }
     return data;
   },
 
@@ -138,7 +147,10 @@ export const catalogService = {
       .eq('resale_rights_verified', true)
       .limit(1000);
 
-    if (error) throw new Error('Catalog filters could not be loaded.');
+    if (error) {
+      logSupabaseError('listCurrencies failed', error);
+      throw new Error('Catalog filters could not be loaded.');
+    }
     return [...new Set((data ?? []).map((row) => row.currency_code).filter(Boolean))].sort();
   },
 };

@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase/client';
+import { logSupabaseError } from '../lib/supabase/errors';
 
 const FRIENDLY_MESSAGES = {
   invalid_credentials: 'The email or password is incorrect.',
@@ -12,6 +13,9 @@ const FRIENDLY_MESSAGES = {
   bad_code_verifier: 'This sign-in link could not be verified in this browser. Restart the sign-in flow and try again.',
   provider_disabled: 'Google sign-in is not enabled for this project yet.',
   email_address_invalid: 'Enter a valid email address.',
+  signup_disabled: 'New account registration is currently disabled.',
+  email_provider_disabled: 'Email sign-up is currently disabled for this store.',
+  unexpected_failure: 'The account service returned an unexpected error. Please try again shortly.',
 };
 
 export class AuthActionError extends Error {
@@ -30,13 +34,19 @@ const clientOrThrow = () => {
 };
 
 const friendlyError = (error) => {
+  logSupabaseError('auth request failed', error);
   const code = typeof error?.code === 'string' ? error.code : 'unknown';
   const normalizedMessage = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
   const message = FRIENDLY_MESSAGES[code]
     || (error?.status === 429 ? FRIENDLY_MESSAGES.over_request_rate_limit : null)
     || (normalizedMessage.includes('fetch') || normalizedMessage.includes('network')
       ? 'We could not reach the authentication service. Check your connection and try again.'
-      : 'We could not complete that request. Please try again.');
+      : (typeof error?.message === 'string' && error.message.trim()
+        // Unmapped Supabase Auth messages are user-safe (e.g. "Password should
+        // contain at least one character of each: ..."); show them verbatim
+        // instead of hiding the real reason behind a generic message.
+        ? error.message.trim()
+        : 'We could not complete that request. Please try again.'));
 
   return new AuthActionError(message, code);
 };
@@ -58,8 +68,12 @@ export const authService = {
       },
     });
     throwIfError(result);
+    // With email confirmation enabled, Supabase returns a user with no
+    // identities (and no error) when the address is already registered.
+    const alreadyRegistered = Array.isArray(result.data.user?.identities) && result.data.user.identities.length === 0;
     return {
       ...result.data,
+      alreadyRegistered,
       emailConfirmationRequired: Boolean(result.data.user && !result.data.session),
     };
   },

@@ -75,9 +75,12 @@ const AuthPage = ({ mode = 'sign-in' }) => {
           return;
         }
         const result = await signUp({ email, password, displayName });
-        if (result.emailConfirmationRequired) {
+        if (result.alreadyRegistered) {
           setCanResendVerification(true);
-          setNotice({ type: 'success', message: 'Check your inbox for a verification link before signing in.' });
+          setNotice({ type: 'error', message: 'An account may already exist for this email. Try signing in, resend the verification email, or reset your password.' });
+        } else if (result.emailConfirmationRequired) {
+          setCanResendVerification(true);
+          setNotice({ type: 'success', message: 'Account created. Check your inbox for a verification link before signing in.' });
         } else {
           navigate(destination, { replace: true });
         }
